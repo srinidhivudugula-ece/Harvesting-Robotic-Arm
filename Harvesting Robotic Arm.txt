@@ -1,0 +1,369 @@
+#include <Servo.h>
+
+// ========================================
+// 1. PIN CONFIGURATION
+// ========================================
+
+// Ultrasonic sensor
+#define TRIG 2
+#define ECHO 3
+
+// Servo pins
+#define BASE_PIN 5
+#define SHOULDER_PIN 6
+#define ELBOW_PIN 9
+#define GRIPPER_PIN 10
+
+// LED pins
+#define GREEN_LED 11
+#define RED_LED 12
+
+// ========================================
+// 2. SERVO OBJECTS
+// ========================================
+
+Servo baseServo;
+Servo shoulderServo;
+Servo elbowServo;
+Servo gripperServo;
+
+// ========================================
+// 3. DISTANCE SETTINGS
+// ========================================
+
+const float MIN_DISTANCE = 5.0;
+const float MAX_DISTANCE = 20.0;
+const float RESET_DISTANCE = 25.0;
+
+// ========================================
+// 4. SIMULATED TCS3200 DATA
+// ========================================
+
+struct Fruit {
+  int red;
+  int green;
+  int blue;
+  const char* name;
+};
+
+// Automatic fruit profiles
+Fruit fruits[] = {
+
+  {850, 400, 180, "RIPE RED FRUIT"},
+
+  {250, 800, 350, "UNRIPE GREEN FRUIT"},
+
+  {550, 450, 250, "PARTIALLY RIPE FRUIT"},
+
+  {850, 400, 180, "RIPE RED FRUIT"}
+
+};
+
+const int TOTAL_FRUITS = 4;
+
+// Profile counter
+int fruitIndex = 0;
+
+// ========================================
+// 5. RIPENESS THRESHOLDS
+// ========================================
+
+const int RED_THRESHOLD = 600;
+const int GREEN_MIN = 200;
+const int GREEN_MAX = 650;
+const int BLUE_MAX = 450;
+
+// ========================================
+// 6. SERVO POSITIONS
+// ========================================
+
+// Home
+const int BASE_HOME = 90;
+const int SHOULDER_HOME = 90;
+const int ELBOW_HOME = 90;
+
+// Gripper
+const int GRIP_OPEN = 80;
+const int GRIP_CLOSE = 25;
+
+// Picking position
+const int BASE_PICK = 70;
+const int SHOULDER_PICK = 120;
+const int ELBOW_PICK = 55;
+
+// Basket position
+const int BASE_BASKET = 150;
+const int SHOULDER_BASKET = 100;
+const int ELBOW_BASKET = 75;
+
+// ========================================
+// 7. SYSTEM VARIABLES
+// ========================================
+
+bool systemArmed = true;
+
+float distanceCM;
+
+int redValue;
+int greenValue;
+int blueValue;
+
+// ========================================
+// 8. SETUP
+// ========================================
+
+void setup() {
+
+  Serial.begin(9600);
+
+  pinMode(TRIG, OUTPUT);
+  pinMode(ECHO, INPUT);
+
+  pinMode(GREEN_LED, OUTPUT);
+  pinMode(RED_LED, OUTPUT);
+
+  baseServo.attach(BASE_PIN);
+  shoulderServo.attach(SHOULDER_PIN);
+  elbowServo.attach(ELBOW_PIN);
+  gripperServo.attach(GRIPPER_PIN);
+
+  digitalWrite(GREEN_LED, LOW);
+  digitalWrite(RED_LED, LOW);
+
+  homePosition();
+
+  Serial.println("==========================");
+  Serial.println(" AGRI-PICK ROBOTIC SYSTEM");
+  Serial.println("==========================");
+
+  Serial.println("Automatic mode activated");
+
+}
+
+// ========================================
+// 9. MAIN LOOP
+// ========================================
+
+void loop() {
+
+  distanceCM = getDistance();
+
+  // Display distance
+  Serial.print("Distance: ");
+  Serial.print(distanceCM);
+  Serial.println(" cm");
+
+  // Detect fruit
+  if (distanceCM >= MIN_DISTANCE &&
+      distanceCM <= MAX_DISTANCE &&
+      systemArmed) {
+
+    // Lock system to prevent repeated detection
+    systemArmed = false;
+
+    Serial.println("--------------------------");
+    Serial.println("FRUIT DETECTED");
+
+    delay(300);
+
+    // Get automatic colour profile
+    readFruitColour();
+
+    // Print simulated RGB
+    Serial.print("RED: ");
+    Serial.println(redValue);
+
+    Serial.print("GREEN: ");
+    Serial.println(greenValue);
+
+    Serial.print("BLUE: ");
+    Serial.println(blueValue);
+
+    // Classify fruit
+    if (isRipe()) {
+
+      Serial.println("STATUS: RIPE");
+      Serial.println("HARVESTING...");
+
+      digitalWrite(GREEN_LED, HIGH);
+      digitalWrite(RED_LED, LOW);
+
+      harvestFruit();
+
+      digitalWrite(GREEN_LED, LOW);
+
+      Serial.println("FRUIT COLLECTED");
+
+    }
+
+    else {
+
+      Serial.println("STATUS: UNRIPE");
+      Serial.println("FRUIT REJECTED");
+
+      digitalWrite(RED_LED, HIGH);
+      digitalWrite(GREEN_LED, LOW);
+
+      delay(1500);
+
+      digitalWrite(RED_LED, LOW);
+
+    }
+
+    // Advance to next profile
+    fruitIndex++;
+
+    if (fruitIndex >= TOTAL_FRUITS) {
+      fruitIndex = 0;
+    }
+
+    Serial.println("Waiting for next fruit...");
+
+  }
+
+  // Reset after fruit leaves
+  if (distanceCM > RESET_DISTANCE) {
+
+    if (!systemArmed) {
+      Serial.println("Previous fruit removed");
+      Serial.println("System rearmed");
+    }
+
+    systemArmed = true;
+
+    digitalWrite(GREEN_LED, LOW);
+    digitalWrite(RED_LED, LOW);
+
+  }
+
+  delay(200);
+
+}
+
+// ========================================
+// 10. ULTRASONIC SENSOR
+// ========================================
+
+float getDistance() {
+
+  digitalWrite(TRIG, LOW);
+  delayMicroseconds(2);
+
+  digitalWrite(TRIG, HIGH);
+  delayMicroseconds(10);
+
+  digitalWrite(TRIG, LOW);
+
+  unsigned long duration =
+      pulseIn(ECHO, HIGH, 30000UL);
+
+  if (duration == 0) {
+    return 999.0;
+  }
+
+  return duration * 0.0343 / 2.0;
+
+}
+
+// ========================================
+// 11. SIMULATED TCS3200 READING
+// ========================================
+
+void readFruitColour() {
+
+  redValue = fruits[fruitIndex].red;
+
+  greenValue = fruits[fruitIndex].green;
+
+  blueValue = fruits[fruitIndex].blue;
+
+  Serial.print("Fruit profile: ");
+
+  Serial.println(fruits[fruitIndex].name);
+
+}
+
+// ========================================
+// 12. RIPENESS CLASSIFICATION
+// ========================================
+
+bool isRipe() {
+
+  if (redValue >= RED_THRESHOLD &&
+      greenValue >= GREEN_MIN &&
+      greenValue <= GREEN_MAX &&
+      blueValue <= BLUE_MAX) {
+
+    return true;
+
+  }
+
+  return false;
+
+}
+
+// ========================================
+// 13. HOME POSITION
+// ========================================
+
+void homePosition() {
+
+  gripperServo.write(GRIP_OPEN);
+
+  baseServo.write(BASE_HOME);
+
+  shoulderServo.write(SHOULDER_HOME);
+
+  elbowServo.write(ELBOW_HOME);
+
+  delay(1000);
+
+}
+
+// ========================================
+// 14. FRUIT HARVESTING
+// ========================================
+
+void harvestFruit() {
+
+  // Step 1: Open gripper
+  gripperServo.write(GRIP_OPEN);
+  delay(500);
+
+  // Step 2: Face the fruit
+  baseServo.write(BASE_PICK);
+  delay(800);
+
+  // Step 3: Reach fruit
+  shoulderServo.write(SHOULDER_PICK);
+  delay(700);
+
+  elbowServo.write(ELBOW_PICK);
+  delay(700);
+
+  // Step 4: Grab fruit
+  gripperServo.write(GRIP_CLOSE);
+  delay(1000);
+
+  // Step 5: Lift fruit
+  elbowServo.write(ELBOW_HOME);
+  shoulderServo.write(SHOULDER_HOME);
+  delay(1000);
+
+  // Step 6: Face basket
+  baseServo.write(BASE_BASKET);
+  delay(1000);
+
+  // Step 7: Reach basket
+  shoulderServo.write(SHOULDER_BASKET);
+  elbowServo.write(ELBOW_BASKET);
+  delay(1000);
+
+  // Step 8: Release fruit
+  gripperServo.write(GRIP_OPEN);
+  delay(1000);
+
+  // Step 9: Return home
+  homePosition();
+
+}
