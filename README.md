@@ -78,7 +78,7 @@ Applications
 - Embedded systems and automation education.
 - Development of intelligent farming equipment.
 
-##Future Improvements
+Future Improvements
 The project can be extended with the following features:
 1. **Physical TCS3200 Integration:** Replace predefined RGB profiles with actual colour measurements.
 2. **Advanced Ripeness Detection:** Implement more accurate colour calibration and fruit-specific classification.
@@ -95,5 +95,3 @@ The project can be extended with the following features:
 - The robotic arm uses predefined servo positions rather than real-time coordinate-based movement.
 - Fruit detection is based on distance and does not independently identify fruit shape or location.
 - The current program assumes a fixed picking position and collection basket position.
-
-**Building smarter agricultural solutions through robotics and automation! 🌱🤖**
